@@ -1,128 +1,567 @@
 
-import { supabase } from "./js/supabase.js";
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard Admin | Roda Rasa</title>
+  <link rel="stylesheet" href="style.css">
 
-// Format harga menjadi Rupiah
-function formatRupiah(harga) {
-  return new Intl.NumberFormat("id-ID", {
-    style: "currency",
-    currency: "IDR",
-    maximumFractionDigits: 0
-  }).format(harga);
-}
+  <style>
+    body {
+      background: #fff8ef;
+    }
 
-// Tampilkan tahun saat ini
-document.getElementById("tahun").textContent =
-  new Date().getFullYear();
+    .admin-header {
+      background: #29231f;
+      color: white;
+      padding: 22px 6%;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 15px;
+      flex-wrap: wrap;
+    }
 
-// AMBIL DATA MENU
-async function tampilkanMenu() {
-  const container = document.getElementById("menu-container");
+    .admin-header h1 {
+      font-size: 23px;
+    }
 
-  const { data, error } = await supabase
-    .from("menu")
-    .select("*")
-    .eq("tersedia", true)
-    .order("nama", { ascending: true });
+    .admin-header span {
+      color: #e87532;
+    }
 
-  if (error) {
-    console.error("Gagal mengambil menu:", error.message);
-    container.innerHTML =
-      '<p class="empty-message">Menu belum bisa dimuat. Silakan coba lagi nanti.</p>';
-    return;
-  }
+    .admin-container {
+      max-width: 1100px;
+      margin: 35px auto;
+      padding: 0 20px;
+    }
 
-  if (!data || data.length === 0) {
-    container.innerHTML =
-      '<p class="empty-message">Belum ada menu tersedia.</p>';
-    return;
-  }
+    .admin-section {
+      background: white;
+      padding: 25px;
+      border-radius: 16px;
+      margin-bottom: 30px;
+      box-shadow: 0 5px 25px rgba(0,0,0,.05);
+    }
 
-  container.innerHTML = data.map(menu => `
-    <article class="menu-card">
-      <img
-        src="${menu.foto_url || "https://placehold.co/600x400?text=Roda+Rasa"}"
-        alt="${menu.nama}"
-        loading="lazy"
-      >
+    .admin-section h2 {
+      margin-bottom: 20px;
+    }
 
-      <div class="menu-card-content">
-        <span class="menu-category">${menu.kategori || "Menu"}</span>
-        <h3>${menu.nama}</h3>
-        <p>${menu.deskripsi || "Menu lezat dari Roda Rasa."}</p>
-        <div class="menu-price">${formatRupiah(menu.harga)}</div>
-      </div>
-    </article>
-  `).join("");
-}
+    .admin-form {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 15px;
+    }
 
-// AMBIL DATA LOKASI
-async function tampilkanLokasi() {
-  const container = document.getElementById("lokasi-container");
+    .admin-form input,
+    .admin-form textarea,
+    .admin-form select {
+      width: 100%;
+      padding: 12px;
+      border: 1px solid #ddd;
+      border-radius: 9px;
+      font: inherit;
+      background: white;
+    }
 
-  const { data, error } = await supabase
-    .from("lokasi")
-    .select("*")
-    .eq("aktif", true);
+    .admin-form textarea {
+      min-height: 85px;
+      resize: vertical;
+    }
 
-  if (error) {
-    console.error("Gagal mengambil lokasi:", error.message);
-    container.innerHTML =
-      '<p class="empty-message">Lokasi belum bisa dimuat.</p>';
-    return;
-  }
+    .full-width {
+      grid-column: 1 / -1;
+    }
 
-  if (!data || data.length === 0) {
-    container.innerHTML =
-      '<p class="empty-message">Belum ada jadwal lokasi jualan.</p>';
-    return;
-  }
+    .admin-button {
+      border: none;
+      padding: 11px 18px;
+      border-radius: 25px;
+      background: #e87532;
+      color: white;
+      font-weight: 700;
+      cursor: pointer;
+    }
 
-  
-container.innerHTML = data.map(lokasi => {
-  const status = lokasi.status || "berjualan";
+    .admin-button:hover {
+      background: #c95b20;
+    }
 
-  let keteranganStatus = "";
+    .logout-button {
+      background: white;
+      color: #29231f;
+    }
 
-  if (status === "berjualan") {
-    keteranganStatus = "Sedang berjualan";
-  } else if (status === "tidak_berjualan") {
-    keteranganStatus = "Hari ini Roda Rasa tidak berjualan.";
-  } else if (status === "lokasi_menyusul") {
-    keteranganStatus = "Lokasi berjualan akan segera diumumkan.";
-  }
+    .cancel-button {
+      background: #77716c;
+    }
 
-  return `
-    <article class="location-card">
-      <h3>${lokasi.hari}</h3>
+    .delete-button {
+      background: #c0392b;
+    }
 
-      <p><strong>Status:</strong> ${keteranganStatus}</p>
+    .admin-list {
+      display: grid;
+      gap: 12px;
+      margin-top: 22px;
+    }
 
-      ${
-        status === "berjualan"
-          ? `
-            <p><strong>Lokasi:</strong> ${lokasi.nama_lokasi || "-"}</p>
-            <p><strong>Alamat:</strong> ${lokasi.alamat || "-"}</p>
-            <p><strong>Jam:</strong> ${lokasi.jam || "-"}</p>
+    .admin-item {
+      border: 1px solid #eee;
+      border-radius: 12px;
+      padding: 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 15px;
+      flex-wrap: wrap;
+    }
 
-            ${
-              lokasi.maps_url
-                ? `<a
-                    href="${lokasi.maps_url}"
-                    target="_blank"
-                    rel="noopener"
-                    class="maps-button"
-                  >Lihat Google Maps</a>`
-                : ""
-            }
-          `
-          : ""
+    .admin-item p {
+      color: #77716c;
+      font-size: 13px;
+    }
+
+    .admin-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .admin-actions button {
+      font-size: 12px;
+      padding: 8px 13px;
+    }
+
+    .admin-message {
+      margin-top: 12px;
+      font-size: 14px;
+      color: #c95b20;
+    }
+
+    .check-row {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      font-size: 14px;
+    }
+
+    .check-row input {
+      width: auto;
+    }
+
+    @media (max-width: 600px) {
+      .admin-form {
+        grid-template-columns: 1fr;
       }
-    </article>
-  `;
-}).join("");
 
-}
+      .full-width {
+        grid-column: auto;
+      }
 
-// JALANKAN KEDUANYA
-tampilkanMenu();
-tampilkanLokasi();
+      .admin-section {
+        padding: 18px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+<header class="admin-header">
+  <h1>Roda<span>Rasa.</span> Admin</h1>
+  <button class="admin-button logout-button" id="logout-button">
+    Keluar
+  </button>
+</header>
+
+<main class="admin-container">
+
+  <section class="admin-section">
+    <h2>Kelola Menu</h2>
+
+    <form id="form-menu" class="admin-form">
+      <input type="hidden" id="menu-id">
+
+      <input id="menu-nama" placeholder="Nama menu" required>
+      <input id="menu-kategori" placeholder="Kategori" required>
+
+      <input id="menu-harga" type="number" min="0"
+        placeholder="Harga (contoh: 15000)" required>
+
+      <input id="menu-foto" type="url"
+        placeholder="URL foto menu">
+
+      <textarea id="menu-deskripsi" class="full-width"
+        placeholder="Deskripsi menu"></textarea>
+
+      <label class="check-row full-width">
+        <input type="checkbox" id="menu-tersedia" checked>
+        Menu tersedia
+      </label>
+
+      <button type="submit" class="admin-button" id="menu-submit">
+        Simpan Menu
+      </button>
+
+      <button type="button" class="admin-button cancel-button"
+        id="menu-cancel" hidden>
+        Batal Edit
+      </button>
+    </form>
+
+    <p class="admin-message" id="menu-message"></p>
+    <div class="admin-list" id="menu-list">Memuat menu...</div>
+  </section>
+
+  <section class="admin-section">
+    <h2>Kelola Lokasi dan Jadwal</h2>
+
+    <form id="form-lokasi" class="admin-form">
+      <input type="hidden" id="lokasi-id">
+
+      <input id="lokasi-hari" placeholder="Hari (contoh: Senin)" required>
+      <input id="lokasi-nama" placeholder="Nama lokasi">
+
+      <input id="lokasi-alamat" placeholder="Alamat lokasi">
+
+      <input id="lokasi-jam" placeholder="Jam (contoh: 10.00 - 17.00)">
+
+      <input id="lokasi-maps" type="url"
+        placeholder="Link Google Maps">
+
+      <select id="lokasi-status" required>
+        <option value="berjualan">Sedang berjualan</option>
+        <option value="tidak_berjualan">Tidak berjualan</option>
+        <option value="lokasi_menyusul">Lokasi menyusul</option>
+      </select>
+
+      <label class="check-row">
+        <input type="checkbox" id="lokasi-aktif" checked>
+        Tampilkan lokasi di website
+      </label>
+
+      <button type="submit" class="admin-button" id="lokasi-submit">
+        Simpan Lokasi
+      </button>
+
+      <button type="button" class="admin-button cancel-button"
+        id="lokasi-cancel" hidden>
+        Batal Edit
+      </button>
+    </form>
+
+    <p class="admin-message" id="lokasi-message"></p>
+    <div class="admin-list" id="lokasi-list">Memuat lokasi...</div>
+  </section>
+
+  <p style="text-align:center;color:#777;margin:25px 0">
+    Roda Rasa Admin Dashboard
+  </p>
+
+</main>
+
+<script type="module">
+  import { supabase } from "./js/supabase.js";
+
+  const ADMIN_ID = "baa53276-888b-4f0b-8594-51fc192a6f28";
+
+  const $ = id => document.getElementById(id);
+
+  let daftarMenu = [];
+  let daftarLokasi = [];
+
+  function escapeHTML(value) {
+    return String(value ?? "").replace(/[&<>"']/g, char => ({
+      "&": "&amp;",
+      "<": "&lt;",
+      ">": "&gt;",
+      '"': "&quot;",
+      "'": "&#39;"
+    })[char]);
+  }
+
+  function rupiah(value) {
+    return new Intl.NumberFormat("id-ID", {
+      style: "currency",
+      currency: "IDR",
+      maximumFractionDigits: 0
+    }).format(value || 0);
+  }
+
+  function pesan(id, text) {
+    $(id).textContent = text;
+  }
+
+  async function periksaAdmin() {
+    const { data, error } = await supabase.auth.getSession();
+
+    if (error || !data.session ||
+        data.session.user.id !== ADMIN_ID) {
+      await supabase.auth.signOut();
+      window.location.replace("login.html");
+      return false;
+    }
+
+    return true;
+  }
+
+  async function muatMenu() {
+    const { data, error } = await supabase
+      .from("menu")
+      .select("*")
+      .order("nama", { ascending: true });
+
+    if (error) {
+      pesan("menu-message", "Gagal memuat menu: " + error.message);
+      return;
+    }
+
+    daftarMenu = data || [];
+
+    $("menu-list").innerHTML = daftarMenu.length
+      ? daftarMenu.map(item => `
+        <article class="admin-item">
+          <div>
+            <strong>${escapeHTML(item.nama)}</strong>
+            <p>${escapeHTML(item.kategori)} · ${rupiah(item.harga)}</p>
+            <p>${item.tersedia ? "Tersedia" : "Tidak tersedia"}</p>
+          </div>
+          <div class="admin-actions">
+            <button class="admin-button" data-edit-menu="${item.id}">
+              Edit
+            </button>
+            <button class="admin-button delete-button"
+              data-delete-menu="${item.id}">
+              Hapus
+            </button>
+          </div>
+        </article>
+      `).join("")
+      : "<p>Belum ada menu.</p>";
+  }
+
+  $("form-menu").addEventListener("submit", async event => {
+    event.preventDefault();
+
+    const id = $("menu-id").value;
+
+    const dataMenu = {
+      nama: $("menu-nama").value.trim(),
+      kategori: $("menu-kategori").value.trim(),
+      harga: Number($("menu-harga").value),
+      foto_url: $("menu-foto").value.trim(),
+      deskripsi: $("menu-deskripsi").value.trim(),
+      tersedia: $("menu-tersedia").checked
+    };
+
+    if (!Number.isFinite(dataMenu.harga) || dataMenu.harga < 0) {
+      pesan("menu-message", "Harga tidak valid.");
+      return;
+    }
+
+    const { error } = id
+      ? await supabase.from("menu").update(dataMenu).eq("id", id)
+      : await supabase.from("menu").insert(dataMenu);
+
+    if (error) {
+      pesan("menu-message", "Gagal menyimpan: " + error.message);
+      return;
+    }
+
+    $("form-menu").reset();
+    $("menu-id").value = "";
+    $("menu-tersedia").checked = true;
+    $("menu-submit").textContent = "Simpan Menu";
+    $("menu-cancel").hidden = true;
+
+    pesan("menu-message", "Menu berhasil disimpan!");
+    await muatMenu();
+  });
+
+  $("menu-list").addEventListener("click", async event => {
+    const edit = event.target.closest("[data-edit-menu]");
+    const hapus = event.target.closest("[data-delete-menu]");
+
+    if (edit) {
+      const item = daftarMenu.find(x => x.id === edit.dataset.editMenu);
+      if (!item) return;
+
+      $("menu-id").value = item.id;
+      $("menu-nama").value = item.nama || "";
+      $("menu-kategori").value = item.kategori || "";
+      $("menu-harga").value = item.harga || 0;
+      $("menu-foto").value = item.foto_url || "";
+      $("menu-deskripsi").value = item.deskripsi || "";
+      $("menu-tersedia").checked = item.tersedia;
+
+      $("menu-submit").textContent = "Update Menu";
+      $("menu-cancel").hidden = false;
+      $("form-menu").scrollIntoView({ behavior: "smooth" });
+    }
+
+    if (hapus) {
+      if (!confirm("Yakin ingin menghapus menu ini?")) return;
+
+      const { error } = await supabase
+        .from("menu")
+        .delete()
+        .eq("id", hapus.dataset.deleteMenu);
+
+      pesan("menu-message", error
+        ? "Gagal menghapus: " + error.message
+        : "Menu berhasil dihapus.");
+
+      await muatMenu();
+    }
+  });
+
+  $("menu-cancel").addEventListener("click", () => {
+    $("form-menu").reset();
+    $("menu-id").value = "";
+    $("menu-tersedia").checked = true;
+    $("menu-submit").textContent = "Simpan Menu";
+    $("menu-cancel").hidden = true;
+    pesan("menu-message", "");
+  });
+
+  async function muatLokasi() {
+    const { data, error } = await supabase
+      .from("lokasi")
+      .select("*")
+      .order("hari", { ascending: true });
+
+    if (error) {
+      pesan("lokasi-message", "Gagal memuat lokasi: " + error.message);
+      return;
+    }
+
+    daftarLokasi = data || [];
+
+    $("lokasi-list").innerHTML = daftarLokasi.length
+      ? daftarLokasi.map(item => `
+        <article class="admin-item">
+          <div>
+            <strong>${escapeHTML(item.hari)}</strong>
+            <p>${escapeHTML(item.nama_lokasi || "-")}</p>
+            <p>Status: ${escapeHTML(item.status || "berjualan")}</p>
+            <p>${item.aktif ? "Ditampilkan" : "Disembunyikan"}</p>
+          </div>
+          <div class="admin-actions">
+            <button class="admin-button" data-edit-lokasi="${item.id}">
+              Edit
+            </button>
+            <button class="admin-button delete-button"
+              data-delete-lokasi="${item.id}">
+              Hapus
+            </button>
+          </div>
+        </article>
+      `).join("")
+      : "<p>Belum ada jadwal lokasi.</p>";
+  }
+
+  $("form-lokasi").addEventListener("submit", async event => {
+    event.preventDefault();
+
+    const id = $("lokasi-id").value;
+
+    const dataLokasi = {
+      hari: $("lokasi-hari").value.trim(),
+      nama_lokasi: $("lokasi-nama").value.trim(),
+      alamat: $("lokasi-alamat").value.trim(),
+      jam: $("lokasi-jam").value.trim(),
+      maps_url: $("lokasi-maps").value.trim(),
+      status: $("lokasi-status").value,
+      aktif: $("lokasi-aktif").checked
+    };
+
+    const { error } = id
+      ? await supabase.from("lokasi").update(dataLokasi).eq("id", id)
+      : await supabase.from("lokasi").insert(dataLokasi);
+
+    if (error) {
+      pesan("lokasi-message", "Gagal menyimpan: " + error.message);
+      return;
+    }
+
+    $("form-lokasi").reset();
+    $("lokasi-id").value = "";
+    $("lokasi-aktif").checked = true;
+    $("lokasi-status").value = "berjualan";
+    $("lokasi-submit").textContent = "Simpan Lokasi";
+    $("lokasi-cancel").hidden = true;
+
+    pesan("lokasi-message", "Lokasi berhasil disimpan!");
+    await muatLokasi();
+  });
+
+  $("lokasi-list").addEventListener("click", async event => {
+    const edit = event.target.closest("[data-edit-lokasi]");
+    const hapus = event.target.closest("[data-delete-lokasi]");
+
+    if (edit) {
+      const item = daftarLokasi.find(x => x.id === edit.dataset.editLokasi);
+      if (!item) return;
+
+      $("lokasi-id").value = item.id;
+      $("lokasi-hari").value = item.hari || "";
+      $("lokasi-nama").value = item.nama_lokasi || "";
+      $("lokasi-alamat").value = item.alamat || "";
+      $("lokasi-jam").value = item.jam || "";
+      $("lokasi-maps").value = item.maps_url || "";
+      $("lokasi-status").value = item.status || "berjualan";
+      $("lokasi-aktif").checked = item.aktif;
+
+      $("lokasi-submit").textContent = "Update Lokasi";
+      $("lokasi-cancel").hidden = false;
+      $("form-lokasi").scrollIntoView({ behavior: "smooth" });
+    }
+
+    if (hapus) {
+      if (!confirm("Yakin ingin menghapus jadwal ini?")) return;
+
+      const { error } = await supabase
+        .from("lokasi")
+        .delete()
+        .eq("id", hapus.dataset.deleteLokasi);
+
+      pesan("lokasi-message", error
+        ? "Gagal menghapus: " + error.message
+        : "Lokasi berhasil dihapus.");
+
+      await muatLokasi();
+    }
+  });
+
+  $("lokasi-cancel").addEventListener("click", () => {
+    $("form-lokasi").reset();
+    $("lokasi-id").value = "";
+    $("lokasi-aktif").checked = true;
+    $("lokasi-status").value = "berjualan";
+    $("lokasi-submit").textContent = "Simpan Lokasi";
+    $("lokasi-cancel").hidden = true;
+    pesan("lokasi-message", "");
+  });
+
+  $("logout-button").addEventListener("click", async () => {
+    const { error } = await supabase.auth.signOut();
+
+    if (error) {
+      alert("Gagal keluar: " + error.message);
+      return;
+    }
+
+    window.location.replace("login.html");
+  });
+
+  if (await periksaAdmin()) {
+    await muatMenu();
+    await muatLokasi();
+  }
+</script>
+
+</body>
+</html>
