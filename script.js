@@ -95,23 +95,35 @@ function formatRupiah(angka) {
   return "Rp" + Number(angka).toLocaleString("id-ID");
 }
 
+
 function renderMenu(items) {
   if (!menuGrid) return;
 
   if (!items || items.length === 0) {
-    menuGrid.innerHTML = `<p class="text-gray-500 col-span-full text-center py-8">Belum ada menu dalam kategori ini.</p>`;
+    menuGrid.innerHTML = `
+      <p class="empty-message">
+        Belum ada menu dalam kategori ini.
+      </p>
+    `;
     return;
   }
 
   menuGrid.innerHTML = items.map(menu => `
-    <article class="food-card">
-      <img src="${menu.foto_url || menu.foto}" alt="${menu.nama}" loading="lazy"
-           onerror="this.onerror=null;this.src='https://placehold.co/600x400/f1e7d8/493629?text=Foto+Menu';">
-      <div class="food-info">
-        <span class="food-category">${menu.kategori}</span>
+    <article class="menu-card">
+      <img
+        src="${menu.foto_url || menu.foto}"
+        alt="${menu.nama}"
+        loading="lazy"
+        onerror="this.onerror=null;this.src='https://placehold.co/600x400/f1e7d8/493629?text=Foto+Menu';"
+      >
+
+      <div class="menu-card-content">
+        <span class="menu-category">${menu.kategori}</span>
         <h3>${menu.nama}</h3>
         <p>${menu.deskripsi || ''}</p>
-        <div class="price">${formatRupiah(menu.harga)}</div>
+        <div class="menu-price">
+          ${formatRupiah(menu.harga)}
+        </div>
       </div>
     </article>
   `).join("");
