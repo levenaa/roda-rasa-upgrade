@@ -1,650 +1,128 @@
 
-<!DOCTYPE html>
-<html lang="id">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Dashboard Admin | Roda Rasa</title>
-  <link rel="stylesheet" href="style.css">
+import { supabase } from "./js/supabase.js";
 
-  <style>
-    body {
-      background: #fff8ef;
-    }
+// Format harga menjadi Rupiah
+function formatRupiah(harga) {
+  return new Intl.NumberFormat("id-ID", {
+    style: "currency",
+    currency: "IDR",
+    maximumFractionDigits: 0
+  }).format(harga);
+}
 
-    .admin-header {
-      background: white;
-      padding: 18px 6%;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      box-shadow: 0 3px 15px rgba(0,0,0,.05);
-      gap: 15px;
-    }
+// Tampilkan tahun saat ini
+document.getElementById("tahun").textContent =
+  new Date().getFullYear();
 
-    .admin-header button,
-    .action-button {
-      border: none;
-      border-radius: 9px;
-      padding: 10px 16px;
-      cursor: pointer;
-      font-weight: 700;
-      background: #e87532;
-      color: white;
-    }
+// AMBIL DATA MENU
+async function tampilkanMenu() {
+  const container = document.getElementById("menu-container");
 
-    .admin-container {
-      max-width: 1100px;
-      margin: 35px auto;
-      padding: 0 20px;
-    }
+  const { data, error } = await supabase
+    .from("menu")
+    .select("*")
+    .eq("tersedia", true)
+    .order("nama", { ascending: true });
 
-    .admin-title {
-      margin-bottom: 25px;
-    }
+  if (error) {
+    console.error("Gagal mengambil menu:", error.message);
+    container.innerHTML =
+      '<p class="empty-message">Menu belum bisa dimuat. Silakan coba lagi nanti.</p>';
+    return;
+  }
 
-    .admin-title h1 {
-      font-family: 'Playfair Display', serif;
-      font-size: 34px;
-    }
+  if (!data || data.length === 0) {
+    container.innerHTML =
+      '<p class="empty-message">Belum ada menu tersedia.</p>';
+    return;
+  }
 
-    .admin-title p {
-      color: #77716c;
-    }
+  container.innerHTML = data.map(menu => `
+    <article class="menu-card">
+      <img
+        src="${menu.foto_url || "https://placehold.co/600x400?text=Roda+Rasa"}"
+        alt="${menu.nama}"
+        loading="lazy"
+      >
 
-    .admin-panel {
-      background: white;
-      border-radius: 16px;
-      padding: 25px;
-      margin-bottom: 25px;
-      box-shadow: 0 7px 25px rgba(0,0,0,.04);
-    }
-
-    .admin-panel h2 {
-      margin-bottom: 20px;
-      font-size: 22px;
-    }
-
-    .admin-form {
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 15px;
-    }
-
-    .form-group {
-      display: flex;
-      flex-direction: column;
-      gap: 7px;
-    }
-
-    .form-group.full {
-      grid-column: 1 / -1;
-    }
-
-    .form-group label {
-      font-size: 13px;
-      font-weight: 700;
-    }
-
-    .form-group input,
-    .form-group textarea,
-    .form-group select {
-      width: 100%;
-      padding: 12px;
-      border: 1px solid #e5ded7;
-      border-radius: 9px;
-      font: inherit;
-      font-size: 14px;
-    }
-
-    .form-group textarea {
-      min-height: 80px;
-      resize: vertical;
-    }
-
-    .form-actions {
-      display: flex;
-      gap: 10px;
-      flex-wrap: wrap;
-      grid-column: 1 / -1;
-    }
-
-    .secondary-button {
-      background: #eee8e2;
-      color: #29231f;
-      border: none;
-      border-radius: 9px;
-      padding: 10px 16px;
-      cursor: pointer;
-      font-weight: 700;
-    }
-
-    .admin-list {
-      display: grid;
-      gap: 12px;
-    }
-
-    .admin-item {
-      border: 1px solid #eee8e2;
-      border-radius: 12px;
-      padding: 15px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      gap: 15px;
-      flex-wrap: wrap;
-    }
-
-    .admin-item p {
-      color: #77716c;
-      font-size: 13px;
-      margin-top: 4px;
-    }
-
-    .item-actions {
-      display: flex;
-      gap: 8px;
-    }
-
-    .edit-button {
-      background: #2878c7;
-    }
-
-    .delete-button {
-      background: #c0392b;
-    }
-
-    .status-message {
-      font-size: 13px;
-      margin: 12px 0;
-      color: #c0392b;
-    }
-
-    .empty-list {
-      color: #77716c;
-      font-size: 14px;
-    }
-
-    @media (max-width: 600px) {
-      .admin-form {
-        grid-template-columns: 1fr;
-      }
-
-      .form-group.full,
-      .form-actions {
-        grid-column: auto;
-      }
-
-      .admin-header {
-        flex-wrap: wrap;
-      }
-    }
-  </style>
-</head>
-
-<body>
-
-  <header class="admin-header">
-    <a href="index.html" class="logo">Roda<span>Rasa.</span></a>
-    <button id="tombol-logout">Keluar</button>
-  </header>
-
-  <main class="admin-container">
-
-    <div class="admin-title">
-      <h1>Dashboard Admin</h1>
-      <p>Kelola menu, harga, lokasi, dan jadwal jualan Roda Rasa.</p>
-    </div>
-
-    <!-- KELOLA MENU -->
-    <section class="admin-panel">
-      <h2>Kelola Menu</h2>
-
-      <form id="form-menu" class="admin-form">
-        <input type="hidden" id="menu-id">
-
-        <div class="form-group">
-          <label for="menu-nama">Nama Menu</label>
-          <input id="menu-nama" type="text" required>
-        </div>
-
-        <div class="form-group">
-          <label for="menu-kategori">Kategori</label>
-          <select id="menu-kategori" required>
-            <option value="">Pilih kategori</option>
-            <option value="makanan">Makanan</option>
-            <option value="minuman">Minuman</option>
-            <option value="camilan">Camilan</option>
-          </select>
-        </div>
-
-        <div class="form-group">
-          <label for="menu-harga">Harga (Rupiah)</label>
-          <input id="menu-harga" type="number" min="0" required>
-        </div>
-
-        <div class="form-group">
-          <label for="menu-foto">URL Foto Menu</label>
-          <input id="menu-foto" type="url" placeholder="https://..." required>
-        </div>
-
-        <div class="form-group full">
-          <label for="menu-deskripsi">Deskripsi Menu</label>
-          <textarea id="menu-deskripsi"></textarea>
-        </div>
-
-        <div class="form-group">
-          <label for="menu-tersedia">Status Menu</label>
-          <select id="menu-tersedia">
-            <option value="true">Tersedia</option>
-            <option value="false">Tidak tersedia</option>
-          </select>
-        </div>
-
-        <div class="form-actions">
-          <button type="submit" class="action-button" id="simpan-menu">
-            Simpan Menu
-          </button>
-          <button type="button" class="secondary-button" id="batal-menu">
-            Batal Edit
-          </button>
-        </div>
-      </form>
-
-      <p id="pesan-menu" class="status-message" role="status"></p>
-
-      <h3 style="margin:25px 0 12px;">Daftar Menu</h3>
-      <div id="daftar-menu" class="admin-list">
-        <p class="empty-list">Memuat menu...</p>
+      <div class="menu-card-content">
+        <span class="menu-category">${menu.kategori || "Menu"}</span>
+        <h3>${menu.nama}</h3>
+        <p>${menu.deskripsi || "Menu lezat dari Roda Rasa."}</p>
+        <div class="menu-price">${formatRupiah(menu.harga)}</div>
       </div>
-    </section>
+    </article>
+  `).join("");
+}
 
-    <!-- KELOLA LOKASI -->
-    <section class="admin-panel">
-      <h2>Kelola Lokasi dan Jadwal</h2>
+// AMBIL DATA LOKASI
+async function tampilkanLokasi() {
+  const container = document.getElementById("lokasi-container");
 
-      <form id="form-lokasi" class="admin-form">
-        <input type="hidden" id="lokasi-id">
+  const { data, error } = await supabase
+    .from("lokasi")
+    .select("*")
+    .eq("aktif", true);
 
-        <div class="form-group">
-          <label for="lokasi-hari">Hari</label>
-          <input id="lokasi-hari" type="text"
-            placeholder="Contoh: Senin" required>
-        </div>
+  if (error) {
+    console.error("Gagal mengambil lokasi:", error.message);
+    container.innerHTML =
+      '<p class="empty-message">Lokasi belum bisa dimuat.</p>';
+    return;
+  }
 
-        <div class="form-group">
-          <label for="lokasi-nama">Nama Lokasi</label>
-          <input id="lokasi-nama" type="text" required>
-        </div>
+  if (!data || data.length === 0) {
+    container.innerHTML =
+      '<p class="empty-message">Belum ada jadwal lokasi jualan.</p>';
+    return;
+  }
 
-        <div class="form-group full">
-          <label for="lokasi-alamat">Alamat</label>
-          <textarea id="lokasi-alamat"></textarea>
-        </div>
+  
+container.innerHTML = data.map(lokasi => {
+  const status = lokasi.status || "berjualan";
 
-        <div class="form-group">
-          <label for="lokasi-jam">Jam Jualan</label>
-          <input id="lokasi-jam" type="text"
-            placeholder="16:00 - 21:00">
-        </div>
+  let keteranganStatus = "";
 
-        <div class="form-group">
-          <label for="lokasi-maps">Link Google Maps</label>
-          <input id="lokasi-maps" type="url"
-            placeholder="https://maps.google.com/...">
-        </div>
+  if (status === "berjualan") {
+    keteranganStatus = "Sedang berjualan";
+  } else if (status === "tidak_berjualan") {
+    keteranganStatus = "Hari ini Roda Rasa tidak berjualan.";
+  } else if (status === "lokasi_menyusul") {
+    keteranganStatus = "Lokasi berjualan akan segera diumumkan.";
+  }
 
-        <div class="form-group">
-          <label for="lokasi-aktif">Status Lokasi</label>
-          <select id="lokasi-aktif">
-            <option value="true">Aktif</option>
-            <option value="false">Tidak aktif</option>
-          </select>
-        </div>
+  return `
+    <article class="location-card">
+      <h3>${lokasi.hari}</h3>
 
-        <div class="form-actions">
-          <button type="submit" class="action-button" id="simpan-lokasi">
-            Simpan Lokasi
-          </button>
-          <button type="button" class="secondary-button" id="batal-lokasi">
-            Batal Edit
-          </button>
-        </div>
-      </form>
+      <p><strong>Status:</strong> ${keteranganStatus}</p>
 
-      <p id="pesan-lokasi" class="status-message" role="status"></p>
+      ${
+        status === "berjualan"
+          ? `
+            <p><strong>Lokasi:</strong> ${lokasi.nama_lokasi || "-"}</p>
+            <p><strong>Alamat:</strong> ${lokasi.alamat || "-"}</p>
+            <p><strong>Jam:</strong> ${lokasi.jam || "-"}</p>
 
-      <h3 style="margin:25px 0 12px;">Daftar Lokasi</h3>
-      <div id="daftar-lokasi" class="admin-list">
-        <p class="empty-list">Memuat lokasi...</p>
-      </div>
-    </section>
-
-  </main>
-
-  <script type="module">
-    import { supabase } from "./js/supabase.js";
-
-    const ADMIN_ID = "baa53276-888b-4f0b-8594-51fc192a6f28";
-
-    const formMenu = document.getElementById("form-menu");
-    const formLokasi = document.getElementById("form-lokasi");
-
-    const pesanMenu = document.getElementById("pesan-menu");
-    const pesanLokasi = document.getElementById("pesan-lokasi");
-
-    let menuData = [];
-    let lokasiData = [];
-
-    // PERIKSA LOGIN ADMIN
-    async function periksaAdmin() {
-      const { data, error } = await supabase.auth.getUser();
-
-      if (error || !data.user || data.user.id !== ADMIN_ID) {
-        await supabase.auth.signOut();
-        window.location.href = "login.html";
-        return false;
+            ${
+              lokasi.maps_url
+                ? `<a
+                    href="${lokasi.maps_url}"
+                    target="_blank"
+                    rel="noopener"
+                    class="maps-button"
+                  >Lihat Google Maps</a>`
+                : ""
+            }
+          `
+          : ""
       }
-
-      return true;
-    }
-
-    // FORMAT HARGA
-    function rupiah(harga) {
-      return new Intl.NumberFormat("id-ID", {
-        style: "currency",
-        currency: "IDR",
-        maximumFractionDigits: 0
-      }).format(harga);
-    }
-
-    // TAMPILKAN MENU
-    async function muatMenu() {
-      const daftar = document.getElementById("daftar-menu");
-
-      const { data, error } = await supabase
-        .from("menu")
-        .select("*")
-        .order("nama");
-
-      if (error) {
-        daftar.textContent = "Gagal memuat menu: " + error.message;
-        return;
-      }
-
-      menuData = data || [];
-
-      daftar.innerHTML = "";
-
-      if (menuData.length === 0) {
-        daftar.textContent = "Belum ada menu.";
-        return;
-      }
-
-      menuData.forEach(menu => {
-        const item = document.createElement("div");
-        item.className = "admin-item";
-
-        const info = document.createElement("div");
-        const nama = document.createElement("strong");
-        nama.textContent = menu.nama;
-
-        const detail = document.createElement("p");
-        detail.textContent =
-          menu.kategori + " • " + rupiah(menu.harga) +
-          " • " + (menu.tersedia ? "Tersedia" : "Tidak tersedia");
-
-        info.append(nama, detail);
-
-        const actions = document.createElement("div");
-        actions.className = "item-actions";
-
-        const edit = document.createElement("button");
-        edit.className = "action-button edit-button";
-        edit.textContent = "Edit";
-        edit.addEventListener("click", () => editMenu(menu.id));
-
-        const hapus = document.createElement("button");
-        hapus.className = "action-button delete-button";
-        hapus.textContent = "Hapus";
-        hapus.addEventListener("click", () => hapusMenu(menu.id));
-
-        actions.append(edit, hapus);
-        item.append(info, actions);
-        daftar.appendChild(item);
-      });
-    }
-
-    // SIMPAN MENU BARU ATAU HASIL EDIT
-    formMenu.addEventListener("submit", async (event) => {
-      event.preventDefault();
-
-      pesanMenu.textContent = "Menyimpan menu...";
-
-      const id = document.getElementById("menu-id").value;
-
-      const menu = {
-        nama: document.getElementById("menu-nama").value.trim(),
-        kategori: document.getElementById("menu-kategori").value,
-        harga: Number(document.getElementById("menu-harga").value),
-        foto_url: document.getElementById("menu-foto").value.trim(),
-        deskripsi: document.getElementById("menu-deskripsi").value.trim(),
-        tersedia: document.getElementById("menu-tersedia").value === "true"
-      };
-
-      let hasil;
-
-      if (id) {
-        hasil = await supabase.from("menu").update(menu).eq("id", id);
-      } else {
-        hasil = await supabase.from("menu").insert(menu);
-      }
-
-      if (hasil.error) {
-        pesanMenu.textContent = "Gagal menyimpan: " + hasil.error.message;
-        return;
-      }
-
-      pesanMenu.textContent = "Menu berhasil disimpan!";
-      formMenu.reset();
-      document.getElementById("menu-id").value = "";
-      muatMenu();
-    });
-
-    // ISI FORM UNTUK EDIT MENU
-    function editMenu(id) {
-      const menu = menuData.find(item => item.id === id);
-      if (!menu) return;
-
-      document.getElementById("menu-id").value = menu.id;
-      document.getElementById("menu-nama").value = menu.nama || "";
-      document.getElementById("menu-kategori").value = menu.kategori || "";
-      document.getElementById("menu-harga").value = menu.harga || "";
-      document.getElementById("menu-foto").value = menu.foto_url || "";
-      document.getElementById("menu-deskripsi").value = menu.deskripsi || "";
-      document.getElementById("menu-tersedia").value =
-        String(menu.tersedia);
-
-      formMenu.scrollIntoView({ behavior: "smooth" });
-      pesanMenu.textContent = "Silakan ubah data menu, lalu klik Simpan Menu.";
-    }
-
-    // HAPUS MENU
-    async function hapusMenu(id) {
-      if (!confirm("Yakin ingin menghapus menu ini?")) return;
-
-      const { error } = await supabase
-        .from("menu")
-        .delete()
-        .eq("id", id);
-
-      if (error) {
-        pesanMenu.textContent = "Gagal menghapus: " + error.message;
-        return;
-      }
-
-      pesanMenu.textContent = "Menu berhasil dihapus.";
-      muatMenu();
-    }
-
-    document.getElementById("batal-menu").addEventListener("click", () => {
-      formMenu.reset();
-      document.getElementById("menu-id").value = "";
-      pesanMenu.textContent = "";
-    });
-
-    // TAMPILKAN LOKASI
-    async function muatLokasi() {
-      const daftar = document.getElementById("daftar-lokasi");
-
-      const { data, error } = await supabase
-        .from("lokasi")
-        .select("*")
-        .order("hari");
-
-      if (error) {
-        daftar.textContent = "Gagal memuat lokasi: " + error.message;
-        return;
-      }
-
-      lokasiData = data || [];
-      daftar.innerHTML = "";
-
-      if (lokasiData.length === 0) {
-        daftar.textContent = "Belum ada lokasi.";
-        return;
-      }
-
-      lokasiData.forEach(lokasi => {
-        const item = document.createElement("div");
-        item.className = "admin-item";
-
-        const info = document.createElement("div");
-        const nama = document.createElement("strong");
-        nama.textContent = lokasi.nama_lokasi;
-
-        const detail = document.createElement("p");
-        detail.textContent =
-          lokasi.hari + " • " + (lokasi.jam || "-") +
-          " • " + (lokasi.aktif ? "Aktif" : "Tidak aktif");
-
-        info.append(nama, detail);
-
-        const actions = document.createElement("div");
-        actions.className = "item-actions";
-
-        const edit = document.createElement("button");
-        edit.className = "action-button edit-button";
-        edit.textContent = "Edit";
-        edit.addEventListener("click", () => editLokasi(lokasi.id));
-
-        const hapus = document.createElement("button");
-        hapus.className = "action-button delete-button";
-        hapus.textContent = "Hapus";
-        hapus.addEventListener("click", () => hapusLokasi(lokasi.id));
-
-        actions.append(edit, hapus);
-        item.append(info, actions);
-        daftar.appendChild(item);
-      });
-    }
-
-    // SIMPAN LOKASI BARU ATAU HASIL EDIT
-    formLokasi.addEventListener("submit", async (event) => {
-      event.preventDefault();
-
-      pesanLokasi.textContent = "Menyimpan lokasi...";
-
-      const id = document.getElementById("lokasi-id").value;
-
-      const lokasi = {
-        hari: document.getElementById("lokasi-hari").value.trim(),
-        nama_lokasi: document.getElementById("lokasi-nama").value.trim(),
-        alamat: document.getElementById("lokasi-alamat").value.trim(),
-        jam: document.getElementById("lokasi-jam").value.trim(),
-        maps_url: document.getElementById("lokasi-maps").value.trim(),
-        aktif: document.getElementById("lokasi-aktif").value === "true"
-      };
-
-      let hasil;
-
-      if (id) {
-        hasil = await supabase.from("lokasi").update(lokasi).eq("id", id);
-      } else {
-        hasil = await supabase.from("lokasi").insert(lokasi);
-      }
-
-      if (hasil.error) {
-        pesanLokasi.textContent =
-          "Gagal menyimpan: " + hasil.error.message;
-        return;
-      }
-
-      pesanLokasi.textContent = "Lokasi berhasil disimpan!";
-      formLokasi.reset();
-      document.getElementById("lokasi-id").value = "";
-      muatLokasi();
-    });
-
-    // ISI FORM UNTUK EDIT LOKASI
-    function editLokasi(id) {
-      const lokasi = lokasiData.find(item => item.id === id);
-      if (!lokasi) return;
-
-      document.getElementById("lokasi-id").value = lokasi.id;
-      document.getElementById("lokasi-hari").value = lokasi.hari || "";
-      document.getElementById("lokasi-nama").value =
-        lokasi.nama_lokasi || "";
-      document.getElementById("lokasi-alamat").value =
-        lokasi.alamat || "";
-      document.getElementById("lokasi-jam").value = lokasi.jam || "";
-      document.getElementById("lokasi-maps").value =
-        lokasi.maps_url || "";
-      document.getElementById("lokasi-aktif").value =
-        String(lokasi.aktif);
-
-      formLokasi.scrollIntoView({ behavior: "smooth" });
-      pesanLokasi.textContent =
-        "Silakan ubah data lokasi, lalu klik Simpan Lokasi.";
-    }
-
-    // HAPUS LOKASI
-    async function hapusLokasi(id) {
-      if (!confirm("Yakin ingin menghapus lokasi ini?")) return;
-
-      const { error } = await supabase
-        .from("lokasi")
-        .delete()
-        .eq("id", id);
-
-      if (error) {
-        pesanLokasi.textContent =
-          "Gagal menghapus: " + error.message;
-        return;
-      }
-
-      pesanLokasi.textContent = "Lokasi berhasil dihapus.";
-      muatLokasi();
-    }
-
-    document.getElementById("batal-lokasi").addEventListener("click", () => {
-      formLokasi.reset();
-      document.getElementById("lokasi-id").value = "";
-      pesanLokasi.textContent = "";
-    });
-
-    // KELUAR DARI AKUN
-    document.getElementById("tombol-logout").addEventListener("click", async () => {
-      await supabase.auth.signOut();
-      window.location.href = "login.html";
-    });
-
-    // MULAI DASHBOARD
-    if (await periksaAdmin()) {
-      muatMenu();
-      muatLokasi();
-    }
-  </script>
-
-</body>
-</html>
+    </article>
+  `;
+}).join("");
+
+}
+
+// JALANKAN KEDUANYA
+tampilkanMenu();
+tampilkanLokasi();
