@@ -191,8 +191,32 @@
       <input id="menu-harga" type="number" min="0"
         placeholder="Harga (contoh: 15000)" required>
 
-      <input id="menu-foto" type="url"
-        placeholder="URL foto menu">
+      <div class="full-width">
+  <label for="menu-foto-file">
+    <strong>Foto Menu</strong>
+  </label>
+
+  <input
+    id="menu-foto-file"
+    type="file"
+    accept="image/*"
+    style="width:100%; padding:12px; margin-top:8px;"
+  >
+
+  <img
+    id="menu-foto-preview"
+    src=""
+    alt="Preview foto menu"
+    style="display:none; width:180px; height:130px; object-fit:cover; border-radius:10px; margin-top:12px;"
+  >
+
+  <input
+    id="menu-foto"
+    type="url"
+    placeholder="Atau masukkan URL foto secara manual"
+    style="margin-top:12px;"
+  >
+</div>
 
       <textarea id="menu-deskripsi" class="full-width"
         placeholder="Deskripsi menu"></textarea>
@@ -342,21 +366,67 @@
       `).join("")
       : "<p>Belum ada menu.</p>";
   }
+  $("menu-foto-file").addEventListener("change", () => {
+  const file = $("menu-foto-file").files[0];
+  const preview = $("menu-foto-preview");
 
+  if (!file) {
+    preview.src = "";
+    preview.style.display = "none";
+    return;
+  }
+
+  if (!file.type.startsWith("image/")) {
+    alert("Pilih file gambar ya.");
+    $("menu-foto-file").value = "";
+    return;
+  }
+
+  preview.src = URL.createObjectURL(file);
+  preview.style.display = "block";
+});
   $("form-menu").addEventListener("submit", async event => {
     event.preventDefault();
 
     const id = $("menu-id").value;
 
-    const dataMenu = {
-      nama: $("menu-nama").value.trim(),
-      kategori: $("menu-kategori").value.trim(),
-      harga: Number($("menu-harga").value),
-      foto_url: $("menu-foto").value.trim(),
-      deskripsi: $("menu-deskripsi").value.trim(),
-      tersedia: $("menu-tersedia").checked
-    };
+    let fotoUrl = $("menu-foto").value.trim();
 
+const fileFoto = $("menu-foto-file").files[0];
+
+if (fileFoto) {
+  if (fileFoto.size > 5 * 1024 * 1024) {
+    pesan("menu-message", "Ukuran foto maksimal 5 MB.");
+    return;
+  }
+
+  const namaFile = `${Date.now()}-${fileFoto.name.replace(/[^a-zA-Z0-9._-]/g, "-")}`;
+  const pathFoto = `${ADMIN_ID}/${namaFile}`;
+
+  const { error: uploadError } = await supabase.storage
+    .from("Foto-menu")
+    .upload(pathFoto, fileFoto);
+
+  if (uploadError) {
+    pesan("menu-message", "Gagal upload foto: " + uploadError.message);
+    return;
+  }
+
+  const { data: urlData } = supabase.storage
+    .from("Foto-menu")
+    .getPublicUrl(pathFoto);
+
+  fotoUrl = urlData.publicUrl;
+}
+
+const dataMenu = {
+  nama: $("menu-nama").value.trim(),
+  kategori: $("menu-kategori").value.trim(),
+  harga: Number($("menu-harga").value),
+  foto_url: fotoUrl,
+  deskripsi: $("menu-deskripsi").value.trim(),
+  tersedia: $("menu-tersedia").checked
+};
     if (!Number.isFinite(dataMenu.harga) || dataMenu.harga < 0) {
       pesan("menu-message", "Harga tidak valid.");
       return;
@@ -372,6 +442,8 @@
     }
 
     $("form-menu").reset();
+    $("menu-foto-preview").src = "";
+    $("menu-foto-preview").style.display = "none";
     $("menu-id").value = "";
     $("menu-tersedia").checked = true;
     $("menu-submit").textContent = "Simpan Menu";
@@ -394,6 +466,12 @@
       $("menu-kategori").value = item.kategori || "";
       $("menu-harga").value = item.harga || 0;
       $("menu-foto").value = item.foto_url || "";
+      if (item.foto_url) {
+      $("menu-foto-preview").src = item.foto_url;
+      $("menu-foto-preview").style.display = "block";
+        } else {
+      $("menu-foto-preview").style.display = "none";
+        }
       $("menu-deskripsi").value = item.deskripsi || "";
       $("menu-tersedia").checked = item.tersedia;
 
