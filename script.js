@@ -8,7 +8,7 @@ let cacheLokasi = [];
 let cacheMenu = [];
 
 // Nomor WhatsApp Pemilik Usaha
-const nomorWhatsApp = "6282225858304";
+const nomorWhatsApp = "6283128087123";
 
 // =============================
 // JADWAL LOKASI RODA RASA
